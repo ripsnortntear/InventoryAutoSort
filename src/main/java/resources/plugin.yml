@@ -1,0 +1,22 @@
+name: InventoryAutoSort
+version: '1.1.5'
+main: com.blackboxai.inventoryautosort.InventoryAutoSort
+api-version: '1.21'
+description: Double right-click empty inventory slots to auto-sort your inventory
+authors: [ blackboxai ]
+website: https://github.com/blackboxai/InventoryAutoSort
+
+commands:
+  inventorysort:
+    description: Toggle inventory auto-sort on/off
+    aliases: [ isort, invsort ]
+    usage: /inventorysort
+    permission: inventoryautosort.use
+
+permissions:
+  inventoryautosort.use:
+    description: Allows the player to use the inventory auto-sort feature
+    default: true
+  inventoryautosort.bypass.cooldown:
+    description: Allows the player to bypass the sort cooldown
+    default: op
