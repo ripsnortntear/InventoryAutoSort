@@ -15,6 +15,7 @@ Sort and stack your entire backpack with a simple **double right-click** on any 
 - 🔕 **Toggle support** — players can disable sorting for themselves
 - 🧺 **Bundle compatible** — right-clicking with a bundle works normally
 - ⚡ **Lightweight** — no dependencies, no database, no config bloat
+- 🌎 **Map Compatible** — will not stack or move maps
 
 ---
 
