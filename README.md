@@ -1,14 +1,14 @@
 # 📦 InventoryAutoSort
 
-A lightweight, hotbar-safe inventory sorting plugin for **Minecraft Paper servers**.  
+A lightweight, hotbar-safe inventory sorting plugin for **Minecraft Paper 1.21.11 Servers**.  
 Sort and stack your entire backpack with a simple **double right-click** on any empty slot — no commands, no hassle.
 
 ---
 
 ## ✨ Features
 
-- 🖱️ **Double right-click** any empty inventory slot to sort
-- 📚 **Auto-stacks** duplicate items before sorting
+- 🖱️ **Double right-click** — any empty inventory slot to sort
+- 📚 **Auto-stacks** — duplicate items before sorting
 - 🔒 **Hotbar preserved** — slots 0-8 are never touched
 - 🎒 **Container support** — sorts chests, barrels, and other containers
 - ⏱️ **Sort cooldown** — prevents spam sorting
@@ -57,7 +57,7 @@ true
 
 ## 🗂️ Sorting Behavior
 
-Scenario                    Behavior
+Scenario:                      Behavior
 
 - Player inventory:            Sorts backpack (slots 9-35) only
 - Hotbar (slots 0-8):          Never touched
