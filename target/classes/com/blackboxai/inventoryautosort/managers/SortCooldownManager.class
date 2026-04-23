@@ -1,0 +1,28 @@
+Êþº¾   A 
+      java/lang/Object <init> ()V  &java/util/concurrent/ConcurrentHashMap
+  	   
+   =com/blackboxai/inventoryautosort/managers/SortCooldownManager lastSortTime Ljava/util/Map;	     firstClickTime	     plugin 4Lcom/blackboxai/inventoryautosort/InventoryAutoSort;
+     startCleanupTask
+      java/lang/System currentTimeMillis ()J ! " # $ % 
+java/util/Map get &(Ljava/lang/Object;)Ljava/lang/Object; ' java/lang/Long
+ & ) * + valueOf (J)Ljava/lang/Long; ! - . / put 8(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+ & 1 2  	longValue      ô ! 6 7 % remove      Ð
+ ; < = > ? java/lang/Math max (JJ)J	  A B C cleanupTask !Lorg/bukkit/scheduler/BukkitTask; E F G H I org/bukkit/scheduler/BukkitTask isCancelled ()Z E K L  cancel ! N O  clear Q ?com/blackboxai/inventoryautosort/managers/SortCooldownManager$1
+ P S  T B(Lcom/blackboxai/inventoryautosort/managers/SortCooldownManager;)V      p
+ P X Y Z runTaskTimerAsynchronously ?(Lorg/bukkit/plugin/Plugin;JJ)Lorg/bukkit/scheduler/BukkitTask; SORT_COOLDOWN_MS J 
+ConstantValue DOUBLE_CLICK_WINDOW_MS CLICK_STALE_THRESHOLD_MS      ˆ 	Signature 1Ljava/util/Map<Ljava/util/UUID;Ljava/lang/Long;>; 7(Lcom/blackboxai/inventoryautosort/InventoryAutoSort;)V Code LineNumberTable LocalVariableTable this ?Lcom/blackboxai/inventoryautosort/managers/SortCooldownManager; 
+registerClick (Ljava/util/UUID;)Z uuid Ljava/util/UUID; now 
+firstClick Ljava/lang/Long; elapsed 
+StackMapTable resetClickTimer (Ljava/util/UUID;)V isOnCooldown lastSort getRemainingCooldown (Ljava/util/UUID;)J 	remaining 
+recordSort removePlayer cleanup 
+SourceFile SortCooldownManager.java NestMembers InnerClasses !       [ \  ]    8  ^ \  ]    3  _ \  ]    `     b    c     b    c       B C   	   d  e   l     $*· *» Y· 	µ 
+*» Y· 	µ *+µ *¶ ±    f       *     #  +  , # - g       $ h i     $     j k  e   æ     Y¸ A*´ +¹   À &:Ç *´ + ¸ (¹ , W¬ ¶ 0e7 3”ž *´ + ¸ (¹ , W¬*´ +¹ 5 W¬    f   .    ?  @  B  D ' E ) H 2 J ; L J M L Q W R g   4    Y h i     Y l m   U n \   F o p  2 ' q \  r   
+ ý ) &ü "  s t  e   D     *´ +¹ 5 W±    f   
+    ]  ^ g        h i      l m   u k  e   €     )*´ 
++¹   À &M,Ç ¬¸ ,¶ 0e 8”œ § ¬    f       j  k  l g        ) h i     ) l m    v p  r    ü  &@  w x  e   ‰     '*´ 
++¹   À &M,Ç 	­ 8¸ ,¶ 0eeB	!¸ :­    f       u  v  w ! x g   *    ' h i     ' l m    v p  !  y \  r    ü  &  z t  e   J     *´ 
++¸ ¸ (¹ , W±    f   
+    ‚  ƒ g        h i      l m   { t  e   S     *´ 
++¹ 5 W*´ +¹ 5 W±    f         ‘  ’ g        h i      l m   |   e   r     /*´ @Æ *´ @¹ D š *´ @¹ J *´ 
+¹ M *´ ¹ M ±    f       ™  š  œ %  . ž g       / h i   r         e   L     *» PY*· R*´  U U¶ Wµ @±    f       ª  ½  ¾ g        h i    }    ~      P €   
+  P      
