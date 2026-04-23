@@ -1,0 +1,5 @@
+com\blackboxai\inventoryautosort\InventoryAutoSort.class
+com\blackboxai\inventoryautosort\managers\SortCooldownManager.class
+com\blackboxai\inventoryautosort\listeners\InventorySortListener$1.class
+com\blackboxai\inventoryautosort\listeners\InventorySortListener.class
+com\blackboxai\inventoryautosort\managers\SortCooldownManager$1.class
