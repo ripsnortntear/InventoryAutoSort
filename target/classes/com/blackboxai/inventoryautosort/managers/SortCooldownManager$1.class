@@ -1,0 +1,21 @@
+Êþº¾   A o  =com/blackboxai/inventoryautosort/managers/SortCooldownManager	      ?com/blackboxai/inventoryautosort/managers/SortCooldownManager$1 this$0 ?Lcom/blackboxai/inventoryautosort/managers/SortCooldownManager;
+ 
+   
+  #org/bukkit/scheduler/BukkitRunnable <init> ()V
+     isCancelled ()Z
+      java/lang/System currentTimeMillis ()J	     lastSortTime Ljava/util/Map;     ! " 
+java/util/Map entrySet ()Ljava/util/Set;   $ % & test !(J)Ljava/util/function/Predicate; ( ) * + , 
+java/util/Set removeIf !(Ljava/util/function/Predicate;)Z	  . /  firstClickTime  $ 2 3 4 5 6 java/util/Map$Entry getValue ()Ljava/lang/Object; 8 java/lang/Long
+ 7 : ;  	longValue      ˆ        B(Lcom/blackboxai/inventoryautosort/managers/SortCooldownManager;)V Code LineNumberTable LocalVariableTable this ALcom/blackboxai/inventoryautosort/managers/SortCooldownManager$1; MethodParameters run now J 
+StackMapTable lambda$run$1 (JLjava/util/Map$Entry;)Z entry Ljava/util/Map$Entry; lambda$run$0 
+SourceFile SortCooldownManager.java EnclosingMethod T  startCleanupTask NestHost BootstrapMethods X (Ljava/lang/Object;)Z Z
+  [ O L ] (Ljava/util/Map$Entry;)Z _
+  ` K L b
+ c d e f g "java/lang/invoke/LambdaMetafactory metafactory Ì(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; InnerClasses Entry k %java/lang/invoke/MethodHandles$Lookup m java/lang/invoke/MethodHandles Lookup    
+           
+ @  A   >     
+*+µ *· 	±    B       ª C       
+ D E     
+    F     €  G   A   Š     =*¶ ™ ±¸ @*´ ´ ¹  º #  ¹ ' W*´ ´ -¹  º 0  ¹ ' W±    B       ®  °  ³ $ ¸ < » C       = D E    1 H I  J    
+ K L  A   Z     ,¹ 1 À 7¶ 9e <”ž § ¬    B       ¹ C        H I      M N  J    @
+ O L  A   Z     ,¹ 1 À 7¶ 9e >”ž § ¬    B       ´ C        H I      M N  J    @  P    Q R     S U     V     a  W Y \ a  W ^ \ h            2  i	 j l n 
