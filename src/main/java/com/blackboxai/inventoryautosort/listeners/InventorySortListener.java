@@ -1,7 +1,10 @@
 package com.blackboxai.inventoryautosort.listeners;
 
 import com.blackboxai.inventoryautosort.InventoryAutoSort;
+import com.blackboxai.inventoryautosort.managers.PlayerSettingsManager;
 import com.blackboxai.inventoryautosort.managers.SortCooldownManager;
+import com.blackboxai.inventoryautosort.model.PlayerSortSettings;
+import com.blackboxai.inventoryautosort.model.PlayerSortSettings.SortMode;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -33,90 +36,76 @@ public class InventorySortListener implements Listener {
 
     private final InventoryAutoSort plugin;
     private final SortCooldownManager cooldownManager;
+    private final PlayerSettingsManager settingsManager;
 
-    // -----------------------------------------------------------------------
-    // Sounds — UI_BUTTON_CLICK was removed in 1.21.x builds.
-    // UI_LOOM_SELECT_PATTERN is a clean, subtle tick available in 1.21.4.
-    // -----------------------------------------------------------------------
     private static final Sound SOUND_FIRST_CLICK  = Sound.UI_LOOM_SELECT_PATTERN;
     private static final Sound SOUND_SORT_SUCCESS = Sound.ENTITY_EXPERIENCE_ORB_PICKUP;
     private static final Sound SOUND_ON_COOLDOWN  = Sound.ENTITY_VILLAGER_NO;
 
-    public InventorySortListener(InventoryAutoSort plugin, SortCooldownManager cooldownManager) {
-        this.plugin = plugin;
+    public InventorySortListener(InventoryAutoSort plugin,
+                                  SortCooldownManager cooldownManager,
+                                  PlayerSettingsManager settingsManager) {
+        this.plugin          = plugin;
         this.cooldownManager = cooldownManager;
+        this.settingsManager = settingsManager;
     }
 
-    // -----------------------------------------------------------------------
+    // -------------------
     // Helpers
-    // -----------------------------------------------------------------------
+    // -------------------
 
     private boolean isEmptySlot(ItemStack item) {
         return item == null || item.getType().isAir();
     }
 
-    /**
-     * Returns true when the player is holding a bundle on their cursor.
-     * Right-clicking an empty slot with a bundle extracts an item from it —
-     * we must NOT cancel that interaction.
-     */
     private boolean isCursorBundle(InventoryClickEvent event) {
         ItemStack cursor = event.getCursor();
         return cursor != null && cursor.getType() == Material.BUNDLE;
     }
 
-    /**
-     * Determines whether the currently open view is the player's own
-     * inventory (crafting grid view) rather than an external container.
-     *
-     * In 1.21.4 the reliable check is InventoryType on the TOP inventory.
-     * CRAFTING  → default player inventory screen
-     * PLAYER    → also the player's own inventory in some edge cases
-     *
-     * Everything else (CHEST, BARREL, SHULKER_BOX, HOPPER, …) is a
-     * container and should be sorted as a whole.
-     */
     private boolean isPlayerInventoryView(InventoryView view) {
         InventoryType topType = view.getTopInventory().getType();
         return topType == InventoryType.CRAFTING
             || topType == InventoryType.PLAYER;
     }
 
-    // -----------------------------------------------------------------------
+    // -------------------
     // Event: Inventory Click
-    // -----------------------------------------------------------------------
+    // -------------------
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     public void onInventoryClick(InventoryClickEvent event) {
-
-        // Only right-clicks
         if (event.getClick() != ClickType.RIGHT) return;
-
-        // Only empty slots
         if (!isEmptySlot(event.getCurrentItem())) return;
-
-        // Let bundle extraction pass through untouched
         if (isCursorBundle(event)) return;
-
-        // Must be a real player
         if (!(event.getWhoClicked() instanceof Player player)) return;
 
         if (!player.hasPermission("inventoryautosort.use")) return;
-        if (plugin.isDisabled(player.getUniqueId())) return;
 
-        // Cancel the vanilla click so nothing odd happens during tracking
+        // Load player settings
+        PlayerSortSettings settings = settingsManager.getSettings(player.getUniqueId());
+
+        // Master toggle check
+        if (!settings.isSortingEnabled()) return;
+
+        // Check whether this is a container or backpack view
+        // and whether the player has that specific sort type enabled
+        InventoryView view = player.getOpenInventory();
+        boolean isPlayerInv = isPlayerInventoryView(view);
+
+        if (isPlayerInv && !settings.isSortBackpack()) return;
+        if (!isPlayerInv && !settings.isSortChests()) return;
+
         event.setCancelled(true);
 
         UUID uuid = player.getUniqueId();
         boolean isDoubleClick = cooldownManager.registerClick(uuid);
 
         if (!isDoubleClick) {
-            // First click — subtle audio feedback
             player.playSound(player.getLocation(), SOUND_FIRST_CLICK, 0.3f, 1.0f);
             return;
         }
 
-        // Double-click confirmed — enforce sort cooldown
         if (cooldownManager.isOnCooldown(uuid)) {
             long remaining = cooldownManager.getRemainingCooldown(uuid);
             double seconds  = remaining / 1000.0;
@@ -126,12 +115,12 @@ public class InventorySortListener implements Listener {
             return;
         }
 
-        performSort(player);
+        performSort(player, settings);
     }
 
-    // -----------------------------------------------------------------------
+    // -------------------
     // Event: Inventory Close
-    // -----------------------------------------------------------------------
+    // -------------------
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onInventoryClose(InventoryCloseEvent event) {
@@ -140,53 +129,48 @@ public class InventorySortListener implements Listener {
         }
     }
 
-    // -----------------------------------------------------------------------
+    // -------------------
     // Event: Player Quit
-    // -----------------------------------------------------------------------
+    // -------------------
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event) {
-        cooldownManager.removePlayer(event.getPlayer().getUniqueId());
+        UUID uuid = event.getPlayer().getUniqueId();
+        cooldownManager.removePlayer(uuid);
+        settingsManager.unloadPlayer(uuid);
     }
 
-    // -----------------------------------------------------------------------
-    // Core Sort Logic
-    // -----------------------------------------------------------------------
+    // -------------------
+    // Core Sort
+    // -------------------
 
-    private void performSort(Player player) {
+    private void performSort(Player player, PlayerSortSettings settings) {
         InventoryView view = player.getOpenInventory();
 
         if (isPlayerInventoryView(view)) {
-            sortPlayerBackpackOnly(player);
+            sortPlayerBackpackOnly(player, settings.getSortMode());
         } else {
-            sortContainerInventory(view.getTopInventory());
+            sortContainerInventory(view.getTopInventory(), settings.getSortMode());
         }
 
-        // Push changes to the client immediately
         player.updateInventory();
-
         cooldownManager.recordSort(player.getUniqueId());
         player.playSound(player.getLocation(), SOUND_SORT_SUCCESS, 0.7f, 1.2f);
         showSortSuccessActionBar(player);
     }
 
-    // -----------------------------------------------------------------------
+    // -------------------
     // Stacking
-    // -----------------------------------------------------------------------
+    // -------------------
 
-    /**
-     * Merges duplicate item stacks into as few slots as possible,
-     * respecting each type's max stack size and item meta.
-     *
-     * Maps (filled or blank) are never merged — each holds unique data.
-     */
     private ItemStack[] stackItems(ItemStack[] items) {
         List<ItemStack> stacked = new ArrayList<>();
 
         for (ItemStack item : items) {
-            if (item == null || item.getType().isAir()) continue;
+            if (item == null || item.getType().isAir()) {
+                continue;
+            }
 
-            // Maps carry unique map IDs — never merge them
             if (item.getType() == Material.FILLED_MAP
                     || item.getType() == Material.MAP) {
                 stacked.add(item.clone());
@@ -199,16 +183,15 @@ public class InventorySortListener implements Listener {
                 if (!existing.isSimilar(item)) continue;
                 if (existing.getAmount() >= existing.getMaxStackSize()) continue;
 
-                int space = existing.getMaxStackSize() - existing.getAmount();
-                int toAdd  = Math.min(space, item.getAmount());
+                int space    = existing.getMaxStackSize() - existing.getAmount();
+                int toAdd    = Math.min(space, item.getAmount());
+                int leftover = item.getAmount() - toAdd;
                 existing.setAmount(existing.getAmount() + toAdd);
 
-                int leftover = item.getAmount() - toAdd;
                 if (leftover <= 0) {
-                    fullyMerged = true;
+				    fullyMerged = true;
                     break;
                 }
-                // Reduce item amount and keep looking for more space
                 item = item.asQuantity(leftover);
             }
 
@@ -220,74 +203,90 @@ public class InventorySortListener implements Listener {
         return stacked.toArray(new ItemStack[0]);
     }
 
-    // -----------------------------------------------------------------------
-    // Player Inventory Sort (backpack only — hotbar preserved)
-    // -----------------------------------------------------------------------
+    // -------------------
+    // Player Backpack Sort
+    // -------------------
 
-    /**
-     * Sorts slots 9-35 (the 27-slot backpack) only.
-     * Slots 0-8 (hotbar) are left completely untouched.
-     */
-    private void sortPlayerBackpackOnly(Player player) {
-        // getStorageContents() returns slots 0-35 (hotbar + backpack)
+    private void sortPlayerBackpackOnly(Player player, SortMode mode) {
         ItemStack[] allContents = player.getInventory().getStorageContents();
 
-        // Pull out the 27 backpack slots
+        // Extract backpack slots only (9-35)
         ItemStack[] backpackItems = new ItemStack[27];
         System.arraycopy(allContents, 9, backpackItems, 0, 27);
 
-        // Stack then sort
         ItemStack[] stacked = stackItems(backpackItems);
         ItemStack[] sorted  = Arrays.stream(stacked)
                 .filter(i -> i != null && !i.getType().isAir())
-                .sorted(buildItemComparator())
+                .sorted(buildComparator(mode))
                 .toArray(ItemStack[]::new);
 
-        // Rebuild full storage: original hotbar + sorted backpack
+        // Rebuild: original hotbar (0-8) + sorted backpack (9-35)
         ItemStack[] finalContents = new ItemStack[36];
-        System.arraycopy(allContents, 0, finalContents, 0, 9);   // hotbar
-        System.arraycopy(sorted,      0, finalContents, 9, sorted.length); // backpack
+        System.arraycopy(allContents, 0, finalContents, 0, 9);
+        System.arraycopy(sorted,      0, finalContents, 9, sorted.length);
 
         player.getInventory().setStorageContents(finalContents);
     }
 
-    // -----------------------------------------------------------------------
-    // Container Sort (chest, barrel, shulker, etc.)
-    // -----------------------------------------------------------------------
+    // -------------------
+    // Container Sort
+    // -------------------
 
-    private void sortContainerInventory(Inventory container) {
+    private void sortContainerInventory(Inventory container, SortMode mode) {
         ItemStack[] contents = container.getContents();
 
         ItemStack[] stacked = stackItems(contents);
         ItemStack[] sorted  = Arrays.stream(stacked)
                 .filter(i -> i != null && !i.getType().isAir())
-                .sorted(buildItemComparator())
+                .sorted(buildComparator(mode))
                 .toArray(ItemStack[]::new);
 
-        // Fill a fresh array the same size as the container
         ItemStack[] result = new ItemStack[contents.length];
         System.arraycopy(sorted, 0, result, 0, sorted.length);
         container.setContents(result);
     }
 
-    // -----------------------------------------------------------------------
-    // Comparator
-    // -----------------------------------------------------------------------
+    // -------------------
+    // Comparators — one per SortMode
+    // --------------
 
     /**
-     * Sort order:
-     *  1. Material name (alphabetical)
-     *  2. Display name (alphabetical, if present)
-     *  3. Damage value (ascending — less damaged first)
-     *  4. Stack size (descending — fuller stacks first)
+     * Returns the correct comparator for the given sort mode.
+     *
+     * TYPE   — alphabetical by Material name, then stack size descending
+     * NAME   — alphabetical by display name (falls back to material name),
+     *           then stack size descending
+     * RARITY — by rarity tier (Common → Uncommon → Rare → Epic),
+     *           then alphabetical by material name within each tier,
+     *           then stack size descending
      */
-    private Comparator<ItemStack> buildItemComparator() {
-        return Comparator
-                // 1. Sort by material name alphabetically
-                .comparing((ItemStack item) -> item.getType().name())
+    private Comparator<ItemStack> buildComparator(SortMode mode) {
+        return switch (mode) {
+            case NAME   -> buildNameComparator();
+            case RARITY -> buildRarityComparator();
+            default     -> buildTypeComparator();   // TYPE is the default
+        };
+    }
 
-                // 2. Sort by custom display name if present
-                .thenComparing(item -> {
+    /** Sort alphabetically by Material name, fuller stacks first. */
+    private Comparator<ItemStack> buildTypeComparator() {
+        return Comparator
+                .comparing((ItemStack item) -> item.getType().name())
+                .thenComparingInt(item -> {
+                    ItemMeta meta = item.getItemMeta();
+                    return (meta instanceof Damageable d) ? d.getDamage() : 0;
+                })
+                .thenComparingInt(item -> -item.getAmount());
+    }
+
+    /**
+     * Sort alphabetically by display name.
+     * Items without a custom name fall back to their Material name
+     * so they sort cleanly alongside named items.
+     */
+    private Comparator<ItemStack> buildNameComparator() {
+        return Comparator
+                .comparing((ItemStack item) -> {
                     ItemMeta meta = item.getItemMeta();
                     if (meta != null && meta.hasDisplayName()) {
                         Component displayName = meta.displayName();
@@ -296,528 +295,198 @@ public class InventorySortListener implements Listener {
                                     .serialize(displayName);
                         }
                     }
-                    return "";
+                    // Fallback: use the material name in Title Case
+                    return toTitleCase(item.getType().name());
                 })
-
-                // 3. Sort by damage value (less damaged = lower number = first)
-                .thenComparingInt(item -> {
-                    ItemMeta meta = item.getItemMeta();
-                    if (meta instanceof Damageable damageable) {
-                        return damageable.getDamage();
-                    }
-                    return 0;
-                })
-
-                // 4. Sort by stack size descending (fuller stacks first)
+                .thenComparing(item -> item.getType().name())
                 .thenComparingInt(item -> -item.getAmount());
     }
 
-    // -----------------------------------------------------------------------
-    // Action Bar Feedback
-    // -----------------------------------------------------------------------
+    /**
+     * Sort by Minecraft item rarity tier, then alphabetically within
+     * each tier, then fuller stacks first.
+     *
+     * Rarity tiers (low → high):
+     *   0 = COMMON    (white)  — most items
+     *   1 = UNCOMMON  (yellow) — golden items, some tools/armour
+     *   2 = RARE      (aqua)   — enchanted books, some special items
+     *   3 = EPIC      (purple) — nether star, elytra, dragon egg, etc.
+     */
+    private Comparator<ItemStack> buildRarityComparator() {
+        return Comparator
+                .comparingInt((ItemStack item) -> getRarityTier(item.getType()))
+                .thenComparing(item -> item.getType().name())
+                .thenComparingInt(item -> -item.getAmount());
+    }
 
     /**
-     * Shows a green success message in the action bar,
-     * then clears it after 2 seconds (40 ticks).
+     * Maps a Material to a numeric rarity tier.
+     * Pottery sherds were renamed from POTTERY_SHARD_* to *_POTTERY_SHERD
+     * in Minecraft 1.20+. All names here are verified against Paper 1.21.4.
      */
+    private int getRarityTier(Material material) {
+        return switch (material) {
+
+            // ── EPIC (3) ─────────────
+            case NETHER_STAR,
+                 DRAGON_EGG,
+                 DRAGON_HEAD,
+                 ELYTRA,
+                 BEACON,
+                 HEART_OF_THE_SEA,
+                 TRIDENT,
+                 TOTEM_OF_UNDYING,
+                 END_CRYSTAL,
+                 ENCHANTED_GOLDEN_APPLE -> 3;
+
+            // ── RARE (2) ─────────────
+            case ENCHANTED_BOOK,
+                 GOLDEN_APPLE,
+                 MUSIC_DISC_13,
+                 MUSIC_DISC_CAT,
+                 MUSIC_DISC_BLOCKS,
+                 MUSIC_DISC_CHIRP,
+                 MUSIC_DISC_FAR,
+                 MUSIC_DISC_MALL,
+                 MUSIC_DISC_MELLOHI,
+                 MUSIC_DISC_STAL,
+                 MUSIC_DISC_STRAD,
+                 MUSIC_DISC_WARD,
+                 MUSIC_DISC_11,
+                 MUSIC_DISC_WAIT,
+                 MUSIC_DISC_OTHERSIDE,
+                 MUSIC_DISC_5,
+                 MUSIC_DISC_PIGSTEP,
+                 MUSIC_DISC_RELIC,
+                 EXPERIENCE_BOTTLE,
+                 NETHERITE_INGOT,
+                 NETHERITE_SWORD,
+                 NETHERITE_PICKAXE,
+                 NETHERITE_AXE,
+                 NETHERITE_SHOVEL,
+                 NETHERITE_HOE,
+                 NETHERITE_HELMET,
+                 NETHERITE_CHESTPLATE,
+                 NETHERITE_LEGGINGS,
+                 NETHERITE_BOOTS,
+                 NETHERITE_SCRAP,
+                 ANCIENT_DEBRIS,
+                 CONDUIT,
+                 SHULKER_SHELL,
+                 NAUTILUS_SHELL,
+                 TURTLE_HELMET,
+                 SPYGLASS,
+                 GOAT_HORN,
+                 ECHO_SHARD,
+                 DISC_FRAGMENT_5,
+                 // Pottery sherds — correct 1.21.4 names
+                 ARCHER_POTTERY_SHERD,
+                 PRIZE_POTTERY_SHERD,
+                 ARMS_UP_POTTERY_SHERD,
+                 SKULL_POTTERY_SHERD,
+                 ANGLER_POTTERY_SHERD,
+                 BLADE_POTTERY_SHERD,
+                 BREWER_POTTERY_SHERD,
+                 BURN_POTTERY_SHERD,
+                 DANGER_POTTERY_SHERD,
+                 EXPLORER_POTTERY_SHERD,
+                 FLOW_POTTERY_SHERD,
+                 FRIEND_POTTERY_SHERD,
+                 GUSTER_POTTERY_SHERD,
+                 HEART_POTTERY_SHERD,
+                 HEARTBREAK_POTTERY_SHERD,
+                 HOWL_POTTERY_SHERD,
+                 MINER_POTTERY_SHERD,
+                 MOURNER_POTTERY_SHERD,
+                 PLENTY_POTTERY_SHERD,
+                 SCRAPE_POTTERY_SHERD,
+                 SHEAF_POTTERY_SHERD,
+                 SHELTER_POTTERY_SHERD,
+                 SNORT_POTTERY_SHERD -> 2;
+
+            // ── UNCOMMON (1) ───────────
+            case GOLDEN_SWORD,
+                 GOLDEN_PICKAXE,
+                 GOLDEN_AXE,
+                 GOLDEN_SHOVEL,
+                 GOLDEN_HOE,
+                 GOLDEN_HELMET,
+                 GOLDEN_CHESTPLATE,
+                 GOLDEN_LEGGINGS,
+                 GOLDEN_BOOTS,
+                 IRON_SWORD,
+                 IRON_PICKAXE,
+                 IRON_AXE,
+                 IRON_SHOVEL,
+                 IRON_HOE,
+                 IRON_HELMET,
+                 IRON_CHESTPLATE,
+                 IRON_LEGGINGS,
+                 IRON_BOOTS,
+                 DIAMOND_SWORD,
+                 DIAMOND_PICKAXE,
+                 DIAMOND_AXE,
+                 DIAMOND_SHOVEL,
+                 DIAMOND_HOE,
+                 DIAMOND_HELMET,
+                 DIAMOND_CHESTPLATE,
+                 DIAMOND_LEGGINGS,
+                 DIAMOND_BOOTS,
+                 BOW,
+                 CROSSBOW,
+                 FISHING_ROD,
+                 FLINT_AND_STEEL,
+                 SHEARS,
+                 SHIELD,
+                 SADDLE,
+                 NAME_TAG,
+                 LEAD,
+                 DIAMOND,
+                 EMERALD,
+                 ENDER_PEARL,
+                 ENDER_EYE,
+                 BLAZE_ROD,
+                 GHAST_TEAR,
+                 NETHER_WART,
+                 WITHER_SKELETON_SKULL,
+                 CREEPER_HEAD,
+                 ZOMBIE_HEAD,
+                 SKELETON_SKULL,
+                 PLAYER_HEAD,
+                 PIGLIN_HEAD,
+                 FILLED_MAP,
+                 RECOVERY_COMPASS,
+                 BUNDLE -> 1;
+
+            // ── COMMON (0) — everything else ─────────
+            default -> 0;
+        };
+    }
+
+    /**
+     * Converts a SNAKE_CASE material name to Title Case for display.
+     * e.g. "DIAMOND_SWORD" → "Diamond Sword"
+     */
+    private String toTitleCase(String snakeCase) {
+        String[] words = snakeCase.toLowerCase().split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String word : words) {
+            if (!word.isEmpty()) {
+                sb.append(Character.toUpperCase(word.charAt(0)))
+                  .append(word.substring(1))
+                  .append(" ");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    // ------------------------
+    // Action Bar Feedback
+    // -----------------------
+
     private void showSortSuccessActionBar(Player player) {
         Component message = Component.text("✔ Inventory sorted & stacked! Hotbar safe ✓")
                 .color(NamedTextColor.GREEN);
-        player.sendActionBar(message);
-
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                // Safety check — player may have logged off during the delay
-                if (player.isOnline()) {
-                    player.sendActionBar(Component.empty());
-                }
-            }
-        }.runTaskLater(plugin, 40L);
-    }
-}package com.blackboxai.inventoryautosort.listeners;
-
-import com.blackboxai.inventoryautosort.InventoryAutoSort;
-import com.blackboxai.inventoryautosort.managers.SortCooldownManager;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Material;
-import org.bukkit.Sound;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.ClickType;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryView;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.Damageable;
-import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
-
-public class InventorySortListener implements Listener {
-
-    private final InventoryAutoSort plugin;
-    private final SortCooldownManager cooldownManager;
-
-    public InventorySortListener(InventoryAutoSort plugin, SortCooldownManager cooldownManager) {
-        this.plugin = plugin;
-        this.cooldownManager = cooldownManager;
-    }
-
-    private boolean isEmptySlot(ItemStack item) {
-        return item == null || item.getType().isAir();
-    }
-
-    /**
-     * Returns true if the item on the player's cursor is a bundle.
-     * When holding a bundle, right-clicking an empty slot pulls an item
-     * out of the bundle — we must NOT cancel that click.
-     */
-    private boolean isCursorBundle(InventoryClickEvent event) {
-        ItemStack cursor = event.getCursor();
-        return cursor != null && cursor.getType() == Material.BUNDLE;
-    }
-
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
-    public void onInventoryClick(InventoryClickEvent event) {
-        // Only care about right-clicks
-        if (event.getClick() != ClickType.RIGHT) return;
-
-        // Only care about empty slots
-        if (!isEmptySlot(event.getCurrentItem())) return;
-
-        // If the player is holding a bundle on their cursor, let Minecraft
-        // handle it normally (extracts item from bundle into the slot).
-        if (isCursorBundle(event)) return;
-
-        Player player = (Player) event.getWhoClicked();
-
-        if (!player.hasPermission("inventoryautosort.use")) return;
-        if (plugin.isDisabled(player.getUniqueId())) return;
-        if (player.getOpenInventory() == null) return;
-
-        // Cancel the click so nothing weird happens while we track double-clicks
-        event.setCancelled(true);
-
-        UUID uuid = player.getUniqueId();
-        boolean isDoubleClick = cooldownManager.registerClick(uuid);
-
-        if (!isDoubleClick) {
-            // First click — play a subtle tick sound as feedback
-            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.3f, 1.0f);
-            return;
-        }
-
-        // Double-click detected — check sort cooldown before sorting
-        if (cooldownManager.isOnCooldown(uuid)) {
-            long remaining = cooldownManager.getRemainingCooldown(uuid);
-            double seconds = remaining / 1000.0;
-            player.sendActionBar(Component.text(String.format(
-                    "§cPlease wait §e%.1fs §cbefore sorting!", seconds)));
-            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.2f);
-            return;
-        }
-
-        performSort(player);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getPlayer() instanceof Player player) {
-            cooldownManager.resetClickTimer(player.getUniqueId());
-        }
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        cooldownManager.removePlayer(event.getPlayer().getUniqueId());
-    }
-
-    // ========== STACKING + SORTING ==========
-
-    private void performSort(Player player) {
-        InventoryView view = player.getOpenInventory();
-
-        if (isPlayerInventoryView(view)) {
-            sortPlayerBackpackOnly(player);
-        } else {
-            sortContainerInventory(view.getTopInventory());
-        }
-
-        player.updateInventory();
-
-        cooldownManager.recordSort(player.getUniqueId());
-        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.7f, 1.2f);
-        showSortSuccessActionBar(player);
-    }
-
-    private boolean isPlayerInventoryView(InventoryView view) {
-        return view.getType().name().contains("CRAFTING") ||
-               view.getTopInventory().getType().toString().contains("PLAYER") ||
-               view.getTopInventory().getHolder() == view.getPlayer();
-    }
-
-    /**
-     * Merges duplicate item stacks into as few slots as possible.
-     * Respects each item type's max stack size.
-     * Items with unique meta (custom names, enchants, etc.) are only
-     * merged with identical meta items.
-     * Maps (filled or blank) are never merged as each holds unique data.
-     */
-    private ItemStack[] stackItems(ItemStack[] items) {
-        List<ItemStack> stacked = new ArrayList<>();
-
-        for (ItemStack item : items) {
-            if (item == null || item.getType().isAir()) continue;
-
-            // Skip stacking for maps — each map has a unique ID and should never be merged
-            if (item.getType() == Material.FILLED_MAP || item.getType() == Material.MAP) {
-                stacked.add(item.clone());
-                continue;
-            }
-
-            boolean merged = false;
-
-            for (ItemStack existing : stacked) {
-                // isSimilar checks type + meta but NOT amount
-                if (existing.isSimilar(item) && existing.getAmount() < existing.getMaxStackSize()) {
-                    int space = existing.getMaxStackSize() - existing.getAmount();
-                    int toAdd = Math.min(space, item.getAmount());
-                    existing.setAmount(existing.getAmount() + toAdd);
-                    item = item.getAmount() - toAdd > 0
-                            ? item.asQuantity(item.getAmount() - toAdd)
-                            : null;
-                    if (item == null) {
-                        merged = true;
-                        break;
-                    }
-                }
-            }
-
-            // If there's a remainder (or nothing merged), add what's left
-            if (!merged && item != null) {
-                stacked.add(item.clone());
-            }
-        }
-
-        return stacked.toArray(new ItemStack[0]);
-    }
-
-    /** Sorts BACKPACK ONLY (slots 9-35). HOTBAR (0-8) preserved! */
-    private void sortPlayerBackpackOnly(Player player) {
-        ItemStack[] allContents = player.getInventory().getStorageContents();
-
-        // Extract BACKPACK only (slots 9-35 = 27 slots)
-        ItemStack[] backpackItems = new ItemStack[27];
-        System.arraycopy(allContents, 9, backpackItems, 0, 27);
-
-        // Stack first, then sort
-        ItemStack[] stackedBackpack = stackItems(backpackItems);
-        ItemStack[] sortedBackpack = Arrays.stream(stackedBackpack)
-                .filter(item -> item != null && !item.getType().isAir())
-                .sorted(buildItemComparator())
-                .toArray(ItemStack[]::new);
-
-        // Rebuild: ORIGINAL hotbar (0-8) + stacked+sorted backpack (9-35)
-        ItemStack[] finalContents = new ItemStack[36];
-
-        // Hotbar preserved (slots 0-8)
-        System.arraycopy(allContents, 0, finalContents, 0, 9);
-
-        // Sorted backpack fills from slot 9 onward, rest stays null (empty)
-        System.arraycopy(sortedBackpack, 0, finalContents, 9, sortedBackpack.length);
-
-        player.getInventory().setStorageContents(finalContents);
-    }
-
-    private void sortContainerInventory(Inventory container) {
-        ItemStack[] contents = container.getContents();
-
-        // Stack first, then sort
-        ItemStack[] stacked = stackItems(contents);
-        ItemStack[] sorted = Arrays.stream(stacked)
-                .filter(item -> item != null && !item.getType().isAir())
-                .sorted(buildItemComparator())
-                .toArray(ItemStack[]::new);
-
-        ItemStack[] sortedContents = new ItemStack[contents.length];
-        System.arraycopy(sorted, 0, sortedContents, 0, sorted.length);
-        container.setContents(sortedContents);
-    }
-
-    private Comparator<ItemStack> buildItemComparator() {
-        return Comparator.comparing((ItemStack item) -> item.getType().name())
-                .thenComparing(item -> {
-                    if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
-                        return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                                .serialize(item.getItemMeta().displayName());
-                    }
-                    return "";
-                })
-                .thenComparingInt(item -> {
-                    if (item.getItemMeta() instanceof Damageable damageable) {
-                        return damageable.getDamage();
-                    }
-                    return 0;
-                })
-                .thenComparingInt(item -> -item.getAmount());
-    }
-
-    private void showSortSuccessActionBar(Player player) {
-        Component message = Component.text("✔ Inventory sorted & stacked! Hotbar safe ✓").color(NamedTextColor.GREEN);
-        player.sendActionBar(message);
-
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (player.isOnline()) {
-                    player.sendActionBar(Component.empty());
-                }
-            }
-        }.runTaskLater(plugin, 40L);
-    }
-}package com.blackboxai.inventoryautosort.listeners;
-
-import com.blackboxai.inventoryautosort.InventoryAutoSort;
-import com.blackboxai.inventoryautosort.managers.SortCooldownManager;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Material;
-import org.bukkit.Sound;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.ClickType;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryView;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.Damageable;
-import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
-
-public class InventorySortListener implements Listener {
-
-    private final InventoryAutoSort plugin;
-    private final SortCooldownManager cooldownManager;
-
-    public InventorySortListener(InventoryAutoSort plugin, SortCooldownManager cooldownManager) {
-        this.plugin = plugin;
-        this.cooldownManager = cooldownManager;
-    }
-
-    private boolean isEmptySlot(ItemStack item) {
-        return item == null || item.getType().isAir();
-    }
-
-    /**
-     * Returns true if the item on the player's cursor is a bundle.
-     * When holding a bundle, right-clicking an empty slot pulls an item
-     * out of the bundle — we must NOT cancel that click.
-     */
-    private boolean isCursorBundle(InventoryClickEvent event) {
-        ItemStack cursor = event.getCursor();
-        return cursor != null && cursor.getType() == Material.BUNDLE;
-    }
-
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
-    public void onInventoryClick(InventoryClickEvent event) {
-        // Only care about right-clicks
-        if (event.getClick() != ClickType.RIGHT) return;
-
-        // Only care about empty slots
-        if (!isEmptySlot(event.getCurrentItem())) return;
-
-        // If the player is holding a bundle on their cursor, let Minecraft
-        // handle it normally (extracts item from bundle into the slot).
-        if (isCursorBundle(event)) return;
-
-        Player player = (Player) event.getWhoClicked();
-
-        if (!player.hasPermission("inventoryautosort.use")) return;
-        if (plugin.isDisabled(player.getUniqueId())) return;
-        if (player.getOpenInventory() == null) return;
-
-        // Cancel the click so nothing weird happens while we track double-clicks
-        event.setCancelled(true);
-
-        UUID uuid = player.getUniqueId();
-        boolean isDoubleClick = cooldownManager.registerClick(uuid);
-
-        if (!isDoubleClick) {
-            // First click — play a subtle tick sound as feedback
-            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.3f, 1.0f);
-            return;
-        }
-
-        // Double-click detected — check sort cooldown before sorting
-        if (cooldownManager.isOnCooldown(uuid)) {
-            long remaining = cooldownManager.getRemainingCooldown(uuid);
-            double seconds = remaining / 1000.0;
-            player.sendActionBar(Component.text(String.format(
-                    "§cPlease wait §e%.1fs §cbefore sorting!", seconds)));
-            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.5f, 1.2f);
-            return;
-        }
-
-        performSort(player);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getPlayer() instanceof Player player) {
-            cooldownManager.resetClickTimer(player.getUniqueId());
-        }
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        cooldownManager.removePlayer(event.getPlayer().getUniqueId());
-    }
-
-    // ========== STACKING + SORTING ==========
-
-    private void performSort(Player player) {
-        InventoryView view = player.getOpenInventory();
-
-        if (isPlayerInventoryView(view)) {
-            sortPlayerBackpackOnly(player);
-        } else {
-            sortContainerInventory(view.getTopInventory());
-        }
-
-        player.updateInventory();
-
-        cooldownManager.recordSort(player.getUniqueId());
-        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.7f, 1.2f);
-        showSortSuccessActionBar(player);
-    }
-
-    private boolean isPlayerInventoryView(InventoryView view) {
-        return view.getType().name().contains("CRAFTING") ||
-               view.getTopInventory().getType().toString().contains("PLAYER") ||
-               view.getTopInventory().getHolder() == view.getPlayer();
-    }
-
-    /**
-     * Merges duplicate item stacks into as few slots as possible.
-     * Respects each item type's max stack size.
-     * Items with unique meta (custom names, enchants, etc.) are only
-     * merged with identical meta items.
-     */
-    private ItemStack[] stackItems(ItemStack[] items) {
-        // Work on clones so we don't mutate originals mid-process
-        List<ItemStack> stacked = new ArrayList<>();
-
-        for (ItemStack item : items) {
-            if (item == null || item.getType().isAir()) continue;
-
-            boolean merged = false;
-
-            for (ItemStack existing : stacked) {
-                // isSimilar checks type + meta but NOT amount
-                if (existing.isSimilar(item) && existing.getAmount() < existing.getMaxStackSize()) {
-                    int space = existing.getMaxStackSize() - existing.getAmount();
-                    int toAdd = Math.min(space, item.getAmount());
-                    existing.setAmount(existing.getAmount() + toAdd);
-                    item = item.getAmount() - toAdd > 0
-                            ? item.asQuantity(item.getAmount() - toAdd)
-                            : null;
-                    if (item == null) {
-                        merged = true;
-                        break;
-                    }
-                }
-            }
-
-            // If there's a remainder (or nothing merged), add what's left
-            if (!merged && item != null) {
-                stacked.add(item.clone());
-            }
-        }
-
-        return stacked.toArray(new ItemStack[0]);
-    }
-
-    /** Sorts BACKPACK ONLY (slots 9-35). HOTBAR (0-8) preserved! */
-    private void sortPlayerBackpackOnly(Player player) {
-        ItemStack[] allContents = player.getInventory().getStorageContents();
-
-        // Extract BACKPACK only (slots 9-35 = 27 slots)
-        ItemStack[] backpackItems = new ItemStack[27];
-        System.arraycopy(allContents, 9, backpackItems, 0, 27);
-
-        // Stack first, then sort
-        ItemStack[] stackedBackpack = stackItems(backpackItems);
-        ItemStack[] sortedBackpack = Arrays.stream(stackedBackpack)
-                .filter(item -> item != null && !item.getType().isAir())
-                .sorted(buildItemComparator())
-                .toArray(ItemStack[]::new);
-
-        // Rebuild: ORIGINAL hotbar (0-8) + stacked+sorted backpack (9-35)
-        ItemStack[] finalContents = new ItemStack[36];
-
-        // Hotbar preserved (slots 0-8)
-        System.arraycopy(allContents, 0, finalContents, 0, 9);
-
-        // Sorted backpack fills from slot 9 onward, rest stays null (empty)
-        System.arraycopy(sortedBackpack, 0, finalContents, 9, sortedBackpack.length);
-
-        player.getInventory().setStorageContents(finalContents);
-    }
-
-    private void sortContainerInventory(Inventory container) {
-        ItemStack[] contents = container.getContents();
-
-        // Stack first, then sort
-        ItemStack[] stacked = stackItems(contents);
-        ItemStack[] sorted = Arrays.stream(stacked)
-                .filter(item -> item != null && !item.getType().isAir())
-                .sorted(buildItemComparator())
-                .toArray(ItemStack[]::new);
-
-        ItemStack[] sortedContents = new ItemStack[contents.length];
-        System.arraycopy(sorted, 0, sortedContents, 0, sorted.length);
-        container.setContents(sortedContents);
-    }
-
-    private Comparator<ItemStack> buildItemComparator() {
-        return Comparator.comparing((ItemStack item) -> item.getType().name())
-                .thenComparing(item -> {
-                    if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
-                        return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                                .serialize(item.getItemMeta().displayName());
-                    }
-                    return "";
-                })
-                .thenComparingInt(item -> {
-                    if (item.getItemMeta() instanceof Damageable damageable) {
-                        return damageable.getDamage();
-                    }
-                    return 0;
-                })
-                .thenComparingInt(item -> -item.getAmount());
-    }
-
-    private void showSortSuccessActionBar(Player player) {
-        Component message = Component.text("✔ Inventory sorted & stacked! Hotbar safe ✓").color(NamedTextColor.GREEN);
         player.sendActionBar(message);
 
         new BukkitRunnable() {

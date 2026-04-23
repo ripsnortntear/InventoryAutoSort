@@ -1,0 +1,18 @@
+name: InventoryAutoSort
+version: 2.0.0
+main: com.blackboxai.inventoryautosort.InventoryAutoSort
+api-version: '1.21'
+description: >
+  Double right-click any empty slot to sort & stack your inventory!
+  Use /autosort to open the settings menu.
+author: BlackboxAI
+
+commands:
+  autosort:
+    description: Open the AutoSort settings menu.
+    usage: /autosort
+
+permissions:
+  inventoryautosort.use:
+    description: Allows a player to use InventoryAutoSort.
+    default: true

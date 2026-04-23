@@ -1,0 +1,15 @@
+# InventoryAutoSort - Server Default Settings
+# These values are applied to players joining for the first time only.
+# Existing players keep their personal settings.
+
+# Master toggle — enable or disable all sorting
+SortInventory: true
+
+# Sort the player's backpack (slots 9-35, hotbar is always preserved)
+SortBackpack: true
+
+# Sort chests, barrels, shulker boxes, and other containers
+SortChests: true
+
+# Sorting mode: Type, Name, or Rarity
+SortType: "Type"
