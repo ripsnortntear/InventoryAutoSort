@@ -1,0 +1,111 @@
+Êþº¾   A4
+      java/lang/Object <init> ()V	  	 
+   @com/blackboxai/inventoryautosort/listeners/InventorySortListener plugin 4Lcom/blackboxai/inventoryautosort/InventoryAutoSort;	     cooldownManager ?Lcom/blackboxai/inventoryautosort/managers/SortCooldownManager;
+      org/bukkit/inventory/ItemStack getType ()Lorg/bukkit/Material;
+      org/bukkit/Material isAir ()Z
+     ! " .org/bukkit/event/inventory/InventoryClickEvent 	getCursor "()Lorg/bukkit/inventory/ItemStack;	  $ % & BUNDLE Lorg/bukkit/Material; ( ) * + , "org/bukkit/inventory/InventoryView getTopInventory "()Lorg/bukkit/inventory/Inventory; . / 0  1 org/bukkit/inventory/Inventory ,()Lorg/bukkit/event/inventory/InventoryType;	 3 4 5 6 7 (org/bukkit/event/inventory/InventoryType CRAFTING *Lorg/bukkit/event/inventory/InventoryType;	 3 9 : 7 PLAYER
+  < = > getClick (()Lorg/bukkit/event/inventory/ClickType;	 @ A B C D $org/bukkit/event/inventory/ClickType RIGHT &Lorg/bukkit/event/inventory/ClickType;
+  F G " getCurrentItem
+  I J K isEmptySlot #(Lorg/bukkit/inventory/ItemStack;)Z
+  M N O isCursorBundle 3(Lorg/bukkit/event/inventory/InventoryClickEvent;)Z
+  Q R S 
+getWhoClicked !()Lorg/bukkit/entity/HumanEntity; U org/bukkit/entity/Player W inventoryautosort.use T Y Z [ 
+hasPermission (Ljava/lang/String;)Z T ] ^ _ getUniqueId ()Ljava/util/UUID;
+ a b c d e 2com/blackboxai/inventoryautosort/InventoryAutoSort 
+isDisabled (Ljava/util/UUID;)Z
+  g h i setCancelled (Z)V
+ k l m n e =com/blackboxai/inventoryautosort/managers/SortCooldownManager 
+registerClick T p q r getLocation ()Lorg/bukkit/Location;	  t u v SOUND_FIRST_CLICK Lorg/bukkit/Sound;>™™š T y z { 	playSound ,(Lorg/bukkit/Location;Lorg/bukkit/Sound;FF)V
+ k } ~ e isOnCooldown
+ k €  ‚ getRemainingCooldown (Ljava/util/UUID;)J@@      † 0Â§cPlease wait Â§e%.1fs Â§cbefore sorting again!
+ ˆ ‰ Š ‹ Œ java/lang/Double valueOf (D)Ljava/lang/Double;
+ Ž   ‘ ’ java/lang/String format 9(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String; ” • – — ˜ "net/kyori/adventure/text/Component text <(Ljava/lang/String;)Lnet/kyori/adventure/text/TextComponent; T š › œ 
+sendActionBar '(Lnet/kyori/adventure/text/Component;)V	  ž Ÿ v SOUND_ON_COOLDOWN?   ?™™š
+  £ ¤ ¥ performSort (Lorg/bukkit/entity/Player;)V
+ § ¨ © ª S .org/bukkit/event/inventory/InventoryCloseEvent 	getPlayer
+ k ¬ ­ ® resetClickTimer (Ljava/util/UUID;)V
+ ° ± ² ª ³ 'org/bukkit/event/player/PlayerQuitEvent ()Lorg/bukkit/entity/Player;
+ k µ ¶ ® removePlayer T ¸ ¹ º getOpenInventory &()Lorg/bukkit/inventory/InventoryView;
+  ¼ ½ ¾ isPlayerInventoryView '(Lorg/bukkit/inventory/InventoryView;)Z
+  À Á ¥ sortPlayerBackpackOnly
+  Ã Ä Å sortContainerInventory #(Lorg/bukkit/inventory/Inventory;)V T Ç È  updateInventory
+ k Ê Ë ® 
+recordSort	  Í Î v SOUND_SORT_SUCCESS?333
+  Ñ Ò ¥ showSortSuccessActionBar Ô java/util/ArrayList
+ Ó 	  × Ø & 
+FILLED_MAP	  Ú Û & MAP
+  Ý Þ " clone à á â ã ä java/util/List add (Ljava/lang/Object;)Z à æ ç è iterator ()Ljava/util/Iterator; ê ë ì í  java/util/Iterator hasNext ê ï ð ñ next ()Ljava/lang/Object;
+  ó ô K 	isSimilar
+  ö ÷ ø 	getAmount ()I
+  ú û ø getMaxStackSize
+ ý þ ÿ  java/lang/Math min (II)I
+  	setAmount (I)V
+ 	 
+asQuantity #(I)Lorg/bukkit/inventory/ItemStack; à
+ toArray (([Ljava/lang/Object;)[Ljava/lang/Object; ![Lorg/bukkit/inventory/ItemStack; T getInventory (()Lorg/bukkit/inventory/PlayerInventory; $org/bukkit/inventory/PlayerInventory getStorageContents #()[Lorg/bukkit/inventory/ItemStack;
+ java/lang/System 	arraycopy *(Ljava/lang/Object;ILjava/lang/Object;II)V
+ !"# 
+stackItems D([Lorg/bukkit/inventory/ItemStack;)[Lorg/bukkit/inventory/ItemStack;
+%&'() java/util/Arrays stream .([Ljava/lang/Object;)Ljava/util/stream/Stream;  +,- test  ()Ljava/util/function/Predicate;/0123 java/util/stream/Stream filter 9(Ljava/util/function/Predicate;)Ljava/util/stream/Stream;
+ 567 buildItemComparator ()Ljava/util/Comparator;/9:; sorted 1(Ljava/util/Comparator;)Ljava/util/stream/Stream; =>? apply "()Ljava/util/function/IntFunction;/AB 5(Ljava/util/function/IntFunction;)[Ljava/lang/Object;DEF setStorageContents $([Lorg/bukkit/inventory/ItemStack;)V .HI getContents + = .MNF setContents P>Q ()Ljava/util/function/Function;STUVW java/util/Comparator 	comparing 5(Ljava/util/function/Function;)Ljava/util/Comparator; PSZ[W 
+thenComparing ]^_ 
+applyAsInt $()Ljava/util/function/ToIntFunction;Sabc thenComparingInt :(Ljava/util/function/ToIntFunction;)Ljava/util/Comparator; ]f /âœ” Inventory sorted & stacked! Hotbar safe âœ“	hijkl .net/kyori/adventure/text/format/NamedTextColor GREEN 0Lnet/kyori/adventure/text/format/NamedTextColor;nopqr &net/kyori/adventure/text/TextComponent color Q(Lnet/kyori/adventure/text/format/TextColor;)Lnet/kyori/adventure/text/Component;t Bcom/blackboxai/inventoryautosort/listeners/InventorySortListener$1
+sv w _(Lcom/blackboxai/inventoryautosort/listeners/InventorySortListener;Lorg/bukkit/entity/Player;)V       (
+s{|} runTaskLater >(Lorg/bukkit/plugin/Plugin;J)Lorg/bukkit/scheduler/BukkitTask;
+ € getItemMeta &()Lorg/bukkit/inventory/meta/ItemMeta;ƒ $org/bukkit/inventory/meta/Damageable‚…† ø 	getDamageˆ‰Š‹  "org/bukkit/inventory/meta/ItemMeta hasDisplayNameˆŽ displayName &()Lnet/kyori/adventure/text/Component;‘’“”• Fnet/kyori/adventure/text/serializer/plain/PlainTextComponentSerializer 	plainText J()Lnet/kyori/adventure/text/serializer/plain/PlainTextComponentSerializer;‘—˜™ 	serialize 8(Lnet/kyori/adventure/text/Component;)Ljava/lang/String;›  
+ žŸ name ()Ljava/lang/String;	¡¢£¤ v org/bukkit/Sound UI_LOOM_SELECT_PATTERN	¡¦§ v ENTITY_EXPERIENCE_ORB_PICKUP	¡©ª v ENTITY_VILLAGER_NO¬ org/bukkit/event/Listener v(Lcom/blackboxai/inventoryautosort/InventoryAutoSort;Lcom/blackboxai/inventoryautosort/managers/SortCooldownManager;)V Code LineNumberTable LocalVariableTable this BLcom/blackboxai/inventoryautosort/listeners/InventorySortListener; item  Lorg/bukkit/inventory/ItemStack; 
+StackMapTable event 0Lorg/bukkit/event/inventory/InventoryClickEvent; cursor view $Lorg/bukkit/inventory/InventoryView; topType onInventoryClick 3(Lorg/bukkit/event/inventory/InventoryClickEvent;)V player Lorg/bukkit/entity/Player; 	remaining J seconds D uuid Ljava/util/UUID; 
+isDoubleClick ZÉ java/util/UUID RuntimeVisibleAnnotations Lorg/bukkit/event/EventHandler; priority  Lorg/bukkit/event/EventPriority; HIGH ignoreCancelled     onInventoryClose 3(Lorg/bukkit/event/inventory/InventoryCloseEvent;)V 0Lorg/bukkit/event/inventory/InventoryCloseEvent; MONITOR onPlayerQuit ,(Lorg/bukkit/event/player/PlayerQuitEvent;)V )Lorg/bukkit/event/player/PlayerQuitEvent; space I toAdd leftover existing fullyMerged items stacked Ljava/util/List; LocalVariableTypeTable 2Ljava/util/List<Lorg/bukkit/inventory/ItemStack;>; allContents 
+backpackItems 
+finalContents 	container  Lorg/bukkit/inventory/Inventory; contents result 	Signature :()Ljava/util/Comparator<Lorg/bukkit/inventory/ItemStack;>; message $Lnet/kyori/adventure/text/Component; lambda$buildItemComparator$7 #(Lorg/bukkit/inventory/ItemStack;)I lambda$buildItemComparator$6 
+damageable &Lorg/bukkit/inventory/meta/Damageable; meta $Lorg/bukkit/inventory/meta/ItemMeta; lambda$buildItemComparator$5 4(Lorg/bukkit/inventory/ItemStack;)Ljava/lang/String; lambda$buildItemComparator$4 lambda$sortContainerInventory$3 $(I)[Lorg/bukkit/inventory/ItemStack; x$0 lambda$sortContainerInventory$2 i lambda$sortPlayerBackpackOnly$1 lambda$sortPlayerBackpackOnly$0 <clinit> 
+SourceFile InventorySortListener.java NestMembers BootstrapMethods ä
+ þ K K
+ (I)Ljava/lang/Object;
+ 
+ýùù
+ û K
+ øù &(Ljava/lang/Object;)Ljava/lang/Object;
+ ÷öö
+ õö (Ljava/lang/Object;)I!
+ "ðïï%
+ &îï(
+)*+,- "java/lang/invoke/LambdaMetafactory metafactory Ì(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; InnerClasses0 %java/lang/invoke/MethodHandles$Lookup2 java/lang/invoke/MethodHandles Lookup !   «             u v    Î v    Ÿ v     ­ ®   Y     *· *+µ *,µ 
+±   ¯       -  . 	 /  0°        ±²                J K ®   T     +Æ 
++¶ ¶ ™ § ¬   ¯       7°       ±²     ³´ µ    @  N O ®   k     +¶ M,Æ ,¶ ² #¦ § ¬   ¯   
+    @  A°        ±²     ¶·   ¸´ µ   
+ ü  @  ½ ¾ ®   s      +¹ ' ¹ - M,² 2¥ 
+,² 8¦ § ¬   ¯   
+    P  Q°         ±²      ¹º   » 7 µ    ü  3@ ¼½ ®  ´  	   Ò+¶ ;² ?¥ ±*+¶ E¶ Hš ±*+¶ L™ ±+¶ PN-Á T™ -À TM§ ±,V¹ X š ±*´ ,¹ \ ¶ `™ ±+¶ f,¹ \ N*´ 
+-¶ j6š ,,¹ o ² sw¹ x ±*´ 
+-¶ |™ D*´ 
+-¶ 7Š ƒo9,…½ Y¸ ‡S¸ ¸ “¹ ™ ,,¹ o ²  ¡¹ x ±*,¶ ¢±   ¯   Z    ]  `  c   f 5 h A i R l W n ^ o h q m s  t € x ‹ y • z ž { © | ° { ¸ } Ë ~ Ì  Ñ ‚°   R  1 ¾¿  • 7ÀÁ  ž .ÂÃ    Ò±²     Ò¶·  5 ¾¿  ^ tÄÅ  h jÆÇ µ    	ü   Tý -Èû KÊ    Ë ÌeÍÎÏZÐ ÑÒ ®   n     +¶ ¦N-Á T™ -À TM*´ 
+,¹ \ ¶ «±   ¯       Š  ‹  °       
+¾¿    ±²     ¶Ó µ    Ê   
+ Ë ÌeÍÔ ÕÖ ®   I     *´ 
++¶ ¯¹ \ ¶ ´±   ¯   
+    •  –°       ±²     ¶× Ê   
+ Ë ÌeÍÔ  ¤ ¥ ®   º     M+¹ · M*,¶ »™ *+¶ ¿§ 
+*,¹ ' ¶ Â+¹ Æ *´ 
++¹ \ ¶ É++¹ o ² ÌÏ¡¹ x *+¶ Ð±   ¯   & 	     Ÿ     ¢ ! ¦ ' ¨ 4 © G ª L «°        M±²     M¾¿   F¹º µ   	 ü  (	 "# ®  @  
+   » ÓY· ÕM+N-¾66¢ Ý-2:Æ Ì¶ ¶ ™ § ¾¶ ² Ö¥ ¶ ² Ù¦ ,¶ Ü¹ ß W§ ™6,¹ å :¹ é ™ s¹ î À :		¶ òš §ÿà	¶ õ	¶ ù¡ §ÿÐ	¶ ù	¶ õd6
+
+¶ õ¸ ü6		¶ õ`¶¶ õd6 	6§ ¶:§ÿ‰š ,¶ Ü¹ ß W„§ÿ",½ ¹
+ À°   ¯   b    ¸  º  » 1 ¾ > ¿ G À S Á V Ä Y Æ w Ç „ È ” Ê ¡ Ë ­ Ì º Î Ä Ï É Ð Ì Ñ Ï Ô Ø Õ Û × à Ø ì º ò Ü°   \ 	 ¡ 7ØÙ 
+ ­ +ÚÙ  Ä ÛÙ  w aÜ´ 	 Y “ÝÇ   Î³´    ±²     Þ   øßà á      øßâ µ   R ÿ    à  ü  ý 
+ êü " þ :ÿ    à   ù ø   Á ¥ ®       v+¹ ¹ M½ N,	-¸*-¶ :¸$º*  ¹. *¶4¹8 º<  ¹@ À:$½ :,	¸	¾¸+¹ ¹C ±   ¯   6 
+   é  ì  í  ð # ñ - ò 3 ó @ ô J ÷ Q ø [ ù h û u ü°   H    v±²     v¾¿   jã   dä  # Sß  J ,:  Q %å   Ä Å ®   Ï     O+¹G M*,¶ N-¸$ºJ  ¹. *¶4¹8 ºK  ¹@ À:,¾½ :¾¸+¹L ±   ¯   * 
+    
+   )	 3 :
+ F N°   >    O±²     Oæç   Hè  
+ Bß  3 :  : é  67 ®   e     'ºO  ¸RºX  ¹Y º\  ¹` ºd  ¹` °   ¯        
+" / !8 &°       '±²  ê   ë  Ò ¥ ®   }     +e¸ “²g¹m M+,¹ ™ »sY*+·u*´ x¶zW±   ¯      D 	E F H &P *Q°        +±²     +¾¿   ìí 
+îï ®   0     *¶ õt¬   ¯      8°       ³´  
+ðï ®   r     *¶~L+Á‚™ +À‚M,¹„ ¬¬   ¯      0 1 2 4°       ñò    ³´    óô µ    ü ˆ
+õö ®   “     +*¶~L+Æ !+¹‡ ™ +¹Œ M,Æ 
+¸,¹– °š°   ¯   "   # $ % & ' !( &' '+°       Ží    +³´    &óô µ    ü 'ˆ
+÷ö ®   2     *¶ ¶œ°   ¯      °       ³´  
+øù ®   /     ½ °   ¯      	°       úÙ  
+û K ®   I     *Æ *¶ ¶ š § ¬   ¯      °       ü´  µ    @
+ýù ®   /     ½ °   ¯       ô°       úÙ  
+þ K ®   I     *Æ *¶ ¶ š § ¬   ¯       ò°       ü´  µ    @ ÿ  ®   3      ² ³ s²¥³ Ì²¨³ ±   ¯       )  *  +         s   R ' ' 	' ' 	' ' '  #' $#.    s      /13 
