@@ -1,0 +1,82 @@
+# ==============================================================================
+# InventoryAutoSort Configuration
+# ==============================================================================
+
+# Time window in milliseconds between the two right-clicks to trigger sorting.
+# Default: 500ms
+double-click-window: 500
+
+# Cooldown in milliseconds a player must wait between successful sorts.
+# Default: 2000ms (2 seconds)
+sort-cooldown: 2000
+
+# Whether to show the action bar message after a successful sort.
+show-action-bar: true
+
+# Custom action bar message upon successful sort (supports Minecraft color codes with & or §).
+action-bar-message: "&a✔ Inventory sorted & stacked! Hotbar safe ✓"
+
+# Cooldown message shown when double-clicking during cooldown.
+# Use {time} as placeholder for remaining seconds.
+cooldown-message: "&cPlease wait &e{time}s &cbefore sorting again!"
+
+# Whether to play subtle sound feedback (click on first tap, chime on sort, villager grunt on cooldown).
+play-sounds: true
+
+# Whether to preserve the hotbar (slots 0-8) untouched when sorting the player's backpack.
+# Default: true
+preserve-hotbar: true
+
+# Container Sorting Settings
+containers:
+  # Enable sorting of external containers (chests, barrels, etc.).
+  # If false, only player backpack sorting will be allowed.
+  enabled: true
+
+  # Whether to allow sorting of virtual inventories (e.g., custom plugin GUIs, virtual chests).
+  # Set to FALSE (default) to prevent sorting virtual vaults and plugin menus (such as PlayerVaultZ,
+  # DeluxeMenus, ChestCommands, etc.).
+  # When false, only physical block containers in the world (chests, barrels, shulker boxes, etc.)
+  # and Ender Chests can be sorted.
+  sort-virtual-inventories: false
+
+  # Whether to allow sorting of Ender Chests.
+  # Default: true
+  sort-ender-chests: true
+
+  # List of allowed InventoryTypes for container sorting.
+  # Any inventory whose type is not listed here will be ignored.
+  allowed-types:
+    - CHEST
+    - BARREL
+    - SHULKER_BOX
+    - ENDER_CHEST
+    - DISPENSER
+    - DROPPER
+    - HOPPER
+
+  # Case-insensitive title patterns (or substrings) of inventories that must NEVER be sorted.
+  # Even if sort-virtual-inventories is enabled, any inventory whose title matches one of these
+  # patterns will be ignored.
+  blacklisted-titles:
+    - "Vault"
+    - "PlayerVault"
+    - "Menu"
+    - "Shop"
+    - "Trade"
+    - "Warps"
+    - "Crate"
+    - "Auction"
+    - "Bank"
+    - "Backpack"
+
+  # Case-insensitive class or package names of InventoryHolders that must NEVER be sorted.
+  # Any inventory with a holder matching these names will be ignored.
+  blacklisted-holders:
+    - "playervault"
+    - "playervaultz"
+    - "menu"
+    - "gui"
+
+# Debug mode - logs detailed sort diagnostic operations to console.
+debug: false

@@ -1,96 +1,149 @@
 # 📦 InventoryAutoSort
 
-A lightweight, hotbar-safe inventory sorting plugin for **Minecraft Paper 1.21.11 Servers**.  
-Sort and stack your entire backpack with a simple **double right-click** on any empty slot — no commands, no hassle.
+A modern, lightweight, hotbar-safe inventory auto-sorting plugin for **Minecraft Paper 1.21.x** servers.  
+Sort and stack your entire backpack or containers with a simple **double right-click** on any empty slot — no commands, no hassle.
 
 ---
 
 ## ✨ Features
 
-- 🖱️ **Double right-click** — any empty inventory slot to sort
-- 📚 **Auto-stacks** — duplicate items before sorting
-- 🔒 **Hotbar preserved** — slots 0-8 are never touched
-- 🎒 **Container support** — sorts chests, barrels, and other containers
-- ⏱️ **Sort cooldown** — prevents spam sorting
-- 🔕 **Toggle support** — players can disable sorting for themselves
-- 🧺 **Bundle compatible** — right-clicking with a bundle works normally
-- ⚡ **Lightweight** — no dependencies, no database, no config bloat
-- 🌎 **Map Compatible** — will not stack or move maps
+- 🖱️ **Double right-click** — any empty slot to sort and stack.
+- 🔒 **Hotbar preserved** — slots 0–8 are protected and never reordered.
+- 📚 **Smart auto-stacking** — merges duplicate items before sorting, respecting max stack sizes.
+- 🎒 **Container support** — sorts chests, double chests, barrels, shulker boxes, and ender chests.
+- 🛡️ **Virtual Vault & GUI protection** — protects virtual vaults and custom menus (e.g. **PlayerVaultZ**, DeluxeMenus, ChestCommands) from having navigation items corrupted or sorted.
+- 🚫 **Configurable blacklists** — easily blacklist specific inventory titles or plugin holder classes.
+- ⏱️ **Sort cooldown & debounce** — configurable cooldown prevents spam sorting.
+- 💾 **Persistent player preferences** — players can toggle sorting on or off (`/isort`), persisting across restarts.
+- 🧺 **Vanilla-friendly** — placing items with right-click while holding items on the cursor works normally without interference.
+- 🌎 **Map safe** — maps are never merged or corrupted.
+- ⚡ **Lightweight & fast** — zero external runtime dependencies, asynchronous preference saving.
 
 ---
 
 ## 🎮 How To Use
 
-1. Open your inventory
-2. **Right-click** an empty slot once *(you'll hear a click sound)*
-3. **Right-click** the same empty slot again quickly
-4. ✅ Your backpack is now sorted and stacked!
+1. Open your inventory or container.
+2. **Right-click** an empty slot once *(you will hear a subtle tick sound)*.
+3. **Right-click** an empty slot on the same inventory again within 500ms.
+4. ✅ Your inventory or container is instantly stacked and sorted!
 
-> Your **hotbar is always safe** and will never be reordered.
-
----
-
-## 🔧 Installation
-
-1. Download the latest `.jar` from [Releases](../../releases)
-2. Drop it into your server's `/plugins` folder
-3. Restart your server
-4. That's it — no configuration needed!
+> **Note:** Clicking in your own backpack sorts your backpack. Clicking in a container sorts that container. Your **hotbar (slots 0–8) is always safe**.
 
 ---
 
-## 📋 Requirements
-- Minecraft 1.21+
-- Paper 1.21.11
-- Java 21+
+## 💻 Commands & Aliases
+
+Commands: `/inventorysort`, `/isort`, `/autosort`
+
+| Command | Permission | Description |
+|---|---|---|
+| `/isort` or `/isort toggle` | `inventoryautosort.use` | Toggle auto-sorting on/off for yourself |
+| `/isort on` | `inventoryautosort.use` | Explicitly enable auto-sorting |
+| `/isort off` | `inventoryautosort.use` | Explicitly disable auto-sorting |
+| `/isort reload` | `inventoryautosort.reload` | Reload `config.yml` |
+| `/isort help` | None | Show command help |
 
 ---
 
 ## 🔑 Permissions
-Default
-inventoryautosort.use
 
-Allows a player to use inventory sorting
-true
+| Permission | Default | Description |
+|---|---|---|
+| `inventoryautosort.use` | `true` | Allows players to use the auto-sort feature |
+| `inventoryautosort.reload` | `op` | Allows reloading plugin configuration |
+| `inventoryautosort.admin` | `op` | Full administrative control (includes reload and use) |
 
 ---
 
-## 🗂️ Sorting Behavior
+## ⚙️ Configuration (`config.yml`)
 
-Scenario:                      Behavior
+```yaml
+# Time window in milliseconds between the two right-clicks to trigger sorting.
+double-click-window: 500
 
-- Player inventory:            Sorts backpack (slots 9-35) only
-- Hotbar (slots 0-8):          Never touched
-- Chest / Barrel / Container:  Entire container is sorted
-- Duplicate item stacks:       Merged before sorting
-- Named / enchanted items:     Only merged with identical copies
-- Bundles on cursor:           Right-click works normally
+# Cooldown in milliseconds between successful sorts.
+sort-cooldown: 2000
+
+# Whether to show the action bar message after a successful sort.
+show-action-bar: true
+action-bar-message: "&a✔ Inventory sorted & stacked! Hotbar safe ✓"
+cooldown-message: "&cPlease wait &e{time}s &cbefore sorting again!"
+
+# Whether to play subtle sound feedback.
+play-sounds: true
+
+# Keep slots 0-8 untouched when sorting player backpack.
+preserve-hotbar: true
+
+containers:
+  # Enable sorting of external containers (chests, barrels, etc.).
+  enabled: true
+
+  # Protect virtual inventories (PlayerVaultZ, plugin GUIs). Set to FALSE (default)
+  # to prevent sorting virtual vaults and plugin menus.
+  sort-virtual-inventories: false
+
+  # Allow sorting Ender Chests.
+  sort-ender-chests: true
+
+  # Allowed inventory types for container sorting.
+  allowed-types:
+    - CHEST
+    - BARREL
+    - SHULKER_BOX
+    - ENDER_CHEST
+    - DISPENSER
+    - DROPPER
+    - HOPPER
+
+  # Titles of inventories to never sort (case-insensitive substring or regex).
+  blacklisted-titles:
+    - "Vault"
+    - "PlayerVault"
+    - "Menu"
+    - "Shop"
+    - "Trade"
+    - "Warps"
+    - "Crate"
+    - "Auction"
+    - "Bank"
+    - "Backpack"
+
+  # InventoryHolder classes to never sort (case-insensitive substring match).
+  blacklisted-holders:
+    - "playervault"
+    - "playervaultz"
+    - "menu"
+    - "gui"
+
+debug: false
+```
 
 ---
 
 ## 🏗️ Building From Source
 
-# Clone the repo
-git clone https://github.com/ripsnortntear/InventoryAutoSort.git
+### Requirements
+- **Java 21+**
+- **Maven 3.8+**
 
-# Navigate into the folder
+```bash
+# Clone the repository
+git clone https://github.com/ripsnortntear/InventoryAutoSort.git
 cd InventoryAutoSort
 
-# Build with Maven
+# Compile and package
 mvn clean package
+```
 
-The compiled .jar will be in the /target folder.
+The compiled shaded jar will be located in the `target/` directory:
+```
+target/InventoryAutoSort-1.3.0.jar
+```
 
 ---
 
-🐛 Found a Bug?
+## 📄 License
 
-Open an Issue and include:
-
-    Your Paper version (/version)
-    What you were doing when it happened
-    Any relevant console errors
-
-🤝 Contributing
-
-Pull requests are welcome! For major changes, please open an issue first to discuss what you'd like to change.
+This project is licensed under the [MIT License](LICENSE).

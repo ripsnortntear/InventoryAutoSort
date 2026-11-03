@@ -1,0 +1,27 @@
+name: InventoryAutoSort
+version: '1.3.0'
+main: me.ripsnortntear.inventoryautosort.InventoryAutoSort
+api-version: '1.21'
+description: Double right-click any empty slot to sort & stack your inventory!
+author: ripsnortntear
+
+commands:
+  inventorysort:
+    description: Manage or toggle InventoryAutoSort.
+    usage: /inventorysort [toggle|on|off|reload|help]
+    aliases: [isort, autosort]
+    permission: inventoryautosort.use
+
+permissions:
+  inventoryautosort.use:
+    description: Allows a player to use InventoryAutoSort.
+    default: true
+  inventoryautosort.reload:
+    description: Allows reloading the InventoryAutoSort configuration.
+    default: op
+  inventoryautosort.admin:
+    description: Full administrative access for InventoryAutoSort.
+    default: op
+    children:
+      inventoryautosort.reload: true
+      inventoryautosort.use: true
